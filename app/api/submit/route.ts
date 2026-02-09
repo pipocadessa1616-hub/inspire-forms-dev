@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     // Buscar dados existentes na coluna G para achar a próxima linha vazia
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "app!G:G",
+      range: "app!C:C",
     });
 
     const nextRow = (existing.data.values?.length ?? 0) + 1;
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     // Escrever nas colunas G, H, I, J (inadimplentes, plano, wellhub, totalpass)
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `app!G${nextRow}:J${nextRow}`,
+      range: `app!C${nextRow}:F${nextRow}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [

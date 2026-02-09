@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
     const { sheets, spreadsheetId } = getSheets();
 
-    // Buscar dados existentes na coluna G para achar a próxima linha vazia
+    // Buscar dados existentes na coluna C para achar a próxima linha vazia
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: "app!C:C",
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       },
     });
 
-    // Escrever nas colunas G, H, I, J (inadimplentes, plano, wellhub, totalpass)
+    // Escrever nas colunas C, D, E, F (inadimplentes, plano, wellhub, totalpass)
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `app!C${nextRow}:F${nextRow}`,

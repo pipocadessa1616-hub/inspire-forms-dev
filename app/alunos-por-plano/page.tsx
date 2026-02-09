@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 interface Unidade {
   id: string;
@@ -9,6 +10,7 @@ interface Unidade {
 }
 
 interface FormData {
+  date: string;
   unidade: string;
   inadimplentes: string;
   plano: string;
@@ -17,6 +19,7 @@ interface FormData {
 }
 
 interface FormErrors {
+  date?: string;
   unidade?: string;
   inadimplentes?: string;
   plano?: string;
@@ -26,6 +29,7 @@ interface FormErrors {
 
 export default function AlunosPorPlanoPage() {
   const [formData, setFormData] = useState<FormData>({
+    date: "",
     unidade: "",
     inadimplentes: "",
     plano: "",
@@ -57,6 +61,9 @@ export default function AlunosPorPlanoPage() {
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
+    if (!formData.date) {
+      newErrors.date = "Selecione uma data";
+    }
     if (!formData.unidade) {
       newErrors.unidade = "Selecione uma unidade";
     }
@@ -93,6 +100,7 @@ export default function AlunosPorPlanoPage() {
 
         setTimeout(() => {
           setFormData({
+            date: "",
             unidade: "",
             inadimplentes: "",
             plano: "",
@@ -123,6 +131,12 @@ export default function AlunosPorPlanoPage() {
     >
       <main className="w-full max-w-2xl">
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl p-8 md:p-12 relative">
+          <Link href="/" className="absolute top-4 left-4 md:top-6 md:left-6 text-[#7867F2] hover:text-[#6441BF] transition-colors" title="Voltar para o início">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 19-7-7 7-7"/>
+              <path d="M19 12H5"/>
+            </svg>
+          </Link>
           <Image
             src="/inspire-logo-transparente.png"
             alt="Inspire"
@@ -155,6 +169,35 @@ export default function AlunosPorPlanoPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* DATA DA INSERÇÃO */}
+            <div>
+              <label
+                htmlFor="date"
+                className="block text-sm font-semibold mb-2"
+                style={{ color: "#6441BF" }}
+              >
+                DATA DA INSERÇÃO
+              </label>
+              <input
+                type="date"
+                id="date"
+                value={formData.date}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, date: e.target.value }));
+                  if (e.target.value) {
+                    setErrors((prev) => ({ ...prev, date: undefined }));
+                  }
+                }}
+                className={`w-full px-4 py-3 border-2 rounded-lg transition-all text-black outline-none ${
+                  errors.date
+                    ? "border-red-500 bg-red-50"
+                    : "border-[#AAACDF] focus:border-[#7867F2]"
+                }`}
+              />
+              {errors.date && (
+                <p className="mt-1 text-sm text-red-600">{errors.date}</p>
+              )}
+            </div>
             {/* UNIDADE */}
             <div>
               <label

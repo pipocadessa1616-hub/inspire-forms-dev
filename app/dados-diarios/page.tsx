@@ -75,6 +75,13 @@ export default function DadosDiariosPage() {
 
     if (!formData.date) {
       newErrors.date = "Selecione uma data";
+    } else {
+      // Para obter o dia da semana de forma confiável, criamos a data a partir de suas partes.
+      const [year, month, day] = formData.date.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day);
+      if (selectedDate.getDay() === 0) { // 0 = Domingo
+        newErrors.date = "Não é possível selecionar datas de domingo.";
+      }
     }
     if (!formData.unidade) {
       newErrors.unidade = "Selecione uma unidade";
@@ -152,6 +159,25 @@ export default function DadosDiariosPage() {
     setErrors((prev) => ({ ...prev, [field]: error }));
   };
 
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    setFormData((prev) => ({ ...prev, date: newDate }));
+
+    if (newDate) {
+      // Para obter o dia da semana de forma confiável, independente do fuso horário,
+      // criamos a data a partir de suas partes.
+      const [year, month, day] = newDate.split('-').map(Number);
+      // O mês no objeto Date do JavaScript é baseado em zero (0-11), então subtraímos 1.
+      const selectedDate = new Date(year, month - 1, day);
+
+      if (selectedDate.getDay() === 0) { // 0 = Domingo
+        setErrors((prev) => ({ ...prev, date: "Não é possível selecionar datas de domingo." }));
+      } else {
+        setErrors((prev) => ({ ...prev, date: undefined }));
+      }
+    }
+  };
+
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4"
@@ -222,12 +248,7 @@ export default function DadosDiariosPage() {
                 type="date"
                 id="date"
                 value={formData.date}
-                onChange={(e) => {
-                  setFormData((prev) => ({ ...prev, date: e.target.value }));
-                  if (e.target.value) {
-                    setErrors((prev) => ({ ...prev, date: undefined }));
-                  }
-                }}
+                onChange={handleDateChange}
                 className={`w-full px-4 py-3 border-2 rounded-lg transition-all text-black outline-none ${
                   errors.date
                     ? "border-red-500 bg-red-50"

@@ -86,7 +86,13 @@ export default function AlunosPorPlanoPage() {
         const res = await fetch("/api/submit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+          unidade: formData.unidade,
+          inadimplentes: formData.inadimplentes,
+          plano: formData.plano,
+          wellhub: formData.wellhub,
+          totalpass: formData.totalpass,
+}),
         });
 
         const data = await res.json();

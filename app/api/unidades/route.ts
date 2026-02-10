@@ -22,9 +22,6 @@ export async function GET() {
     return NextResponse.json(unidades);
   } catch (error) {
     console.error("Erro ao ler unidades:", error);
-    return NextResponse.json(
-      { error: "Erro ao carregar unidades" },
-      { status: 500 }
-    );
+    return NextResponse.json([], { status: 500 }); // ← MUDOU AQUI
   }
 }

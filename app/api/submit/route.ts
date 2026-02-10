@@ -1,6 +1,35 @@
 import { NextResponse } from "next/server";
 import { getSheets } from "@/lib/google-sheets";
 
+// GET - Buscar dados existentes (para exibir na página)
+export async function GET() {
+  try {
+    const { sheets, spreadsheetId } = getSheets();
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "app!A2:F", // A partir da linha 2 (assumindo linha 1 é header)
+    });
+
+    const rows = response.data.values ?? [];
+
+    const dados = rows.map((row) => ({
+      data: row[0],
+      unidade: row[1],
+      inadimplentes: row[2],
+      plano: row[3],
+      wellhub: row[4],
+      totalpass: row[5],
+    }));
+
+    return NextResponse.json(dados);
+  } catch (error) {
+    console.error("Erro ao buscar dados:", error);
+    return NextResponse.json([], { status: 500 });
+  }
+}
+
+// POST - Inserir novos dados (seu código existente)
 export async function POST(request: Request) {
   try {
     const { unidade, inadimplentes, plano, wellhub, totalpass } =

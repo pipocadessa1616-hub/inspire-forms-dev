@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSheets } from "@/lib/google-sheets";
 
-// GET - Buscar dados existentes (para exibir na página)
+// Força a rota a ser dinâmica para garantir que os dados estejam sempre atualizados
+export const dynamic = 'force-dynamic';
+
+// GET - Buscar dados existentes
 export async function GET() {
   try {
     const { sheets, spreadsheetId } = getSheets();
@@ -13,7 +16,8 @@ export async function GET() {
 
     const rows = response.data.values ?? [];
 
-    const dados = rows.map((row) => ({
+    const dados = rows.map((row, index) => ({
+      rowIndex: index + 2, // Adiciona o índice da linha (baseado em 1, +1 do header)
       data: row[0],
       unidade: row[1],
       inadimplentes: row[2],
@@ -29,10 +33,10 @@ export async function GET() {
   }
 }
 
-// POST - Inserir novos dados (seu código existente)
+// POST - Inserir novos dados
 export async function POST(request: Request) {
   try {
-    const { unidade, inadimplentes, plano, wellhub, totalpass } =
+    const { date, unidade, inadimplentes, plano, wellhub, totalpass } =
       await request.json();
 
     const { sheets, spreadsheetId } = getSheets();
@@ -45,8 +49,14 @@ export async function POST(request: Request) {
 
     const nextRow = (existing.data.values?.length ?? 0) + 1;
 
-    const today = new Date();
-    const dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+    let dateStr;
+    if (date) {
+      const [year, month, day] = date.split("-");
+      dateStr = `${day}/${month}/${year}`;
+    } else {
+      const today = new Date();
+      dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+    }
 
     // Escrever nas colunas A e B (data e unidade)
     await sheets.spreadsheets.values.update({
@@ -80,6 +90,57 @@ export async function POST(request: Request) {
     console.error("Erro ao salvar na planilha:", error);
     return NextResponse.json(
       { error: "Erro ao salvar dados na planilha" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Atualizar dados existentes
+export async function PUT(request: Request) {
+  try {
+    const { rowIndex, date, unidade, inadimplentes, plano, wellhub, totalpass } =
+      await request.json();
+
+    if (!rowIndex) {
+      return NextResponse.json(
+        { error: "Índice da linha é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    const { sheets, spreadsheetId } = getSheets();
+
+    // Formatar a data para o padrão da planilha (DD/MM/YYYY) se vier no formato ISO (YYYY-MM-DD)
+    let formattedDate = date;
+    if (date && date.includes("-")) {
+      const [year, month, day] = date.split("-");
+      formattedDate = `${day}/${month}/${year}`;
+    }
+
+    // Atualizar a linha específica (Colunas A até F)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `app!A${rowIndex}:F${rowIndex}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [
+          [
+            formattedDate,
+            String(unidade),
+            Number(inadimplentes),
+            Number(plano),
+            Number(wellhub),
+            Number(totalpass),
+          ],
+        ],
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Erro ao atualizar dados:", error);
+    return NextResponse.json(
+      { error: "Erro ao atualizar dados na planilha" },
       { status: 500 }
     );
   }

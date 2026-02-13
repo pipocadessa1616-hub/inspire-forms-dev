@@ -87,6 +87,7 @@ export default function AlunosPorPlanoPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+          date: formData.date,
           unidade: formData.unidade,
           inadimplentes: formData.inadimplentes,
           plano: formData.plano,

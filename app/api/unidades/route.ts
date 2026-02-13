@@ -10,6 +10,7 @@ export async function GET() {
       range: "Unidades!A2:B",
     });
 
+   
     const rows = response.data.values ?? [];
 
     const unidades = rows

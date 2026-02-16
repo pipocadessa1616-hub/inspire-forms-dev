@@ -79,6 +79,14 @@ export default function HistoricoEdicaoPage() {
     return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
   };
 
+  // Função auxiliar para converter YYYY-MM-DD para DD/MM/YYYY
+  const formatDateForDisplay = (dateStr: string) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+  };
+
   // Filtrar e Ordenar Registros
   const filteredRecords = useMemo(() => {
     let filtered = [...records];
@@ -111,7 +119,9 @@ export default function HistoricoEdicaoPage() {
   };
 
   const handleEditClick = (record: DataRecord) => {
-    setEditingRecord({ ...record });
+    // Converter data para formato YYYY-MM-DD ao abrir o modal
+    const dateForInput = formatDateForInput(record.data);
+    setEditingRecord({ ...record, data: dateForInput });
     setSaveMessage(null);
   };
 
@@ -123,23 +133,41 @@ export default function HistoricoEdicaoPage() {
     setSaveMessage(null);
 
     try {
+      // Preparar dados para enviar para API (com o campo "date" que a API espera)
+      const payload = {
+        rowIndex: editingRecord.rowIndex,
+        date: editingRecord.data, // API espera "date", não "data"
+        unidade: editingRecord.unidade,
+        inadimplentes: editingRecord.inadimplentes,
+        plano: editingRecord.plano,
+        wellhub: editingRecord.wellhub,
+        totalpass: editingRecord.totalpass,
+      };
+
+      console.log("📤 Enviando para API:", payload);
+
       const res = await fetch("/api/submit", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingRecord),
+        body: JSON.stringify(payload),
       });
+
+      console.log("📥 Resposta da API - Status:", res.status);
+      const responseData = await res.json();
+      console.log("📥 Resposta da API - Dados:", responseData);
 
       if (!res.ok) throw new Error("Erro ao salvar");
 
-      // Atualizar lista localmente
-      setRecords(prev => prev.map(r => r.rowIndex === editingRecord.rowIndex ? editingRecord : r));
-      
-      // Converter data de volta para DD/MM/YYYY se foi alterada para YYYY-MM-DD pelo input
-      if (editingRecord.data.includes('-')) {
-         const [year, month, day] = editingRecord.data.split('-');
-         const formattedDisplayDate = `${day}/${month}/${year}`;
-         setRecords(prev => prev.map(r => r.rowIndex === editingRecord.rowIndex ? { ...editingRecord, data: formattedDisplayDate } : r));
-      }
+      // Converter data de volta para DD/MM/YYYY para exibição
+      const displayDate = editingRecord.data.includes('-') 
+        ? formatDateForDisplay(editingRecord.data) 
+        : editingRecord.data;
+
+      // Atualizar lista localmente com a data formatada
+      const updatedRecord = { ...editingRecord, data: displayDate };
+      setRecords(prev => prev.map(r => 
+        r.rowIndex === updatedRecord.rowIndex ? updatedRecord : r
+      ));
 
       setSaveMessage({ type: 'success', text: "Registro atualizado com sucesso!" });
       setTimeout(() => {
@@ -152,6 +180,11 @@ export default function HistoricoEdicaoPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDateChange = (newDate: string) => {
+    if (!editingRecord) return;
+    setEditingRecord({ ...editingRecord, data: newDate });
   };
 
   return (
@@ -333,8 +366,8 @@ export default function HistoricoEdicaoPage() {
                   <label className="block text-xs font-bold text-gray-500 mb-1">DATA</label>
                   <input
                     type="date"
-                    value={formatDateForInput(editingRecord.data)}
-                    onChange={(e) => setEditingRecord({ ...editingRecord, data: e.target.value })}
+                    value={editingRecord.data}
+                    onChange={(e) => handleDateChange(e.target.value)}
                     className="w-full p-2 border rounded focus:border-[#7867F2] outline-none text-gray-800"
                     required
                   />

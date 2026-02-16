@@ -56,6 +56,16 @@ export default function Home() {
             >
               Alunos por plano
             </Link>
+            <Link
+              href="/historico-edicao"
+              className="block w-full text-center text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#7867F2]"
+              style={{
+                background: "linear-gradient(135deg, #7867F2, #6441BF)",
+              }}
+            >
+              Histórico/edição APP
+              
+            </Link>
           </div>
         </div>
       </main>

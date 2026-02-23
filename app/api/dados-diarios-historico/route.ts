@@ -11,7 +11,7 @@ export async function GET() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "app!A2:F", // A partir da linha 2 (assumindo linha 1 é header)
+      range: "Comercial!A2:J", // A partir da linha 2 (assumindo linha 1 é header)
     });
 
     const rows = response.data.values ?? [];
@@ -20,15 +20,19 @@ export async function GET() {
       rowIndex: index + 2, // Adiciona o índice da linha (baseado em 1, +1 do header)
       data: row[0],
       unidade: row[1],
-      inadimplentes: row[2],
-      plano: row[3],
-      wellhub: row[4],
-      totalpass: row[5],
+      leadsRecebidos: row[2] || "0",
+      experimentaisAgendadas: row[3] || "0",
+      aulasRealizadas: row[4] || "0",
+      vendas: row[5] || "0",
+      totalpassAgendamentos: row[6] || "0",
+      totalpassPresencas: row[7] || "0",
+      wellhubAgendamentos: row[8] || "0",
+      wellhubPresenca: row[9] || "0",
     }));
 
     return NextResponse.json(dados);
   } catch (error) {
-    console.error("Erro ao buscar dados:", error);
+    console.error("Erro ao buscar dados diários:", error);
     return NextResponse.json([], { status: 500 });
   }
 }
@@ -36,11 +40,22 @@ export async function GET() {
 // POST - Inserir novos dados
 export async function POST(request: Request) {
   try {
-    const { date, unidade, inadimplentes, plano, wellhub, totalpass } =
-      await request.json();
+    const { 
+      date, 
+      unidade, 
+      leadsRecebidos, 
+      experimentaisAgendadas, 
+      aulasRealizadas, 
+      vendas,
+      totalpassAgendamentos,
+      totalpassPresencas,
+      wellhubAgendamentos,
+      wellhubPresenca
+    } = await request.json();
 
     const { sheets, spreadsheetId } = getSheets();
 
+    // Formatar data
     let dateStr;
     if (date) {
       const [year, month, day] = date.split("-");
@@ -53,7 +68,7 @@ export async function POST(request: Request) {
     // ✅ CORREÇÃO 1: Verificar se já existe um registro com a mesma data e unidade
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "app!A2:F",
+      range: "Comercial!A2:J",
     });
 
     const rows = existing.data.values ?? [];
@@ -68,26 +83,30 @@ export async function POST(request: Request) {
 
     const nextRow = (existing.data.values?.length ?? 0) + 2; // +2 porque começa em A2
 
-    // ✅ CORREÇÃO 2: Escrever tudo em UMA ÚNICA requisição
+    // ✅ CORREÇÃO 2: Escrever todas as colunas de uma vez (A até J)
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `app!A${nextRow}:F${nextRow}`,
+      range: `Comercial!A${nextRow}:J${nextRow}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [[
           dateStr,
           String(unidade),
-          Number(inadimplentes),
-          Number(plano),
-          Number(wellhub),
-          Number(totalpass),
+          Number(leadsRecebidos) || 0,
+          Number(experimentaisAgendadas) || 0,
+          Number(aulasRealizadas) || 0,
+          Number(vendas) || 0,
+          Number(totalpassAgendamentos) || 0,
+          Number(totalpassPresencas) || 0,
+          Number(wellhubAgendamentos) || 0,
+          Number(wellhubPresenca) || 0,
         ]],
       },
     });
 
     return NextResponse.json({ success: true, row: nextRow });
   } catch (error) {
-    console.error("Erro ao salvar na planilha:", error);
+    console.error("Erro ao salvar dados diários na planilha:", error);
     return NextResponse.json(
       { error: "Erro ao salvar dados na planilha" },
       { status: 500 }
@@ -98,8 +117,19 @@ export async function POST(request: Request) {
 // PUT - Atualizar dados existentes
 export async function PUT(request: Request) {
   try {
-    const { rowIndex, date, unidade, inadimplentes, plano, wellhub, totalpass } =
-      await request.json();
+    const { 
+      rowIndex, 
+      date, 
+      unidade, 
+      leadsRecebidos, 
+      experimentaisAgendadas, 
+      aulasRealizadas, 
+      vendas,
+      totalpassAgendamentos,
+      totalpassPresencas,
+      wellhubAgendamentos,
+      wellhubPresenca
+    } = await request.json();
 
     if (!rowIndex) {
       return NextResponse.json(
@@ -120,7 +150,7 @@ export async function PUT(request: Request) {
     // ✅ CORREÇÃO 3: Verificar se a linha ainda existe antes de atualizar
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `app!A${rowIndex}:F${rowIndex}`,
+      range: `Comercial!A${rowIndex}:J${rowIndex}`,
     });
 
     if (!existing.data.values || existing.data.values.length === 0) {
@@ -130,28 +160,30 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Atualizar a linha específica (Colunas A até F)
+    // Atualizar a linha específica (Colunas A até J)
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `app!A${rowIndex}:F${rowIndex}`,
+      range: `Comercial!A${rowIndex}:J${rowIndex}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
-        values: [
-          [
-            formattedDate,
-            String(unidade),
-            Number(inadimplentes),
-            Number(plano),
-            Number(wellhub),
-            Number(totalpass),
-          ],
-        ],
+        values: [[
+          formattedDate,
+          String(unidade),
+          Number(leadsRecebidos) || 0,
+          Number(experimentaisAgendadas) || 0,
+          Number(aulasRealizadas) || 0,
+          Number(vendas) || 0,
+          Number(totalpassAgendamentos) || 0,
+          Number(totalpassPresencas) || 0,
+          Number(wellhubAgendamentos) || 0,
+          Number(wellhubPresenca) || 0,
+        ]],
       },
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Erro ao atualizar dados:", error);
+    console.error("Erro ao atualizar dados diários:", error);
     return NextResponse.json(
       { error: "Erro ao atualizar dados na planilha" },
       { status: 500 }
@@ -159,7 +191,7 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE - Excluir uma linha da planilha de Alunos por Plano
+// DELETE - Excluir uma linha da planilha
 export async function DELETE(request: Request) {
   try {
     const { rowIndex } = await request.json();
@@ -176,7 +208,7 @@ export async function DELETE(request: Request) {
     // ✅ CORREÇÃO 4: Verificar se a linha existe antes de excluir
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `app!A${rowIndex}:F${rowIndex}`,
+      range: `Comercial!A${rowIndex}:J${rowIndex}`,
     });
 
     if (!existing.data.values || existing.data.values.length === 0) {
@@ -186,13 +218,13 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Busca o ID da aba "app"
+    // Primeiro buscamos as informações da planilha para garantir que temos o ID correto da aba "Comercial"
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheet = spreadsheet.data.sheets?.find(s => s.properties?.title === "app");
+    const sheet = spreadsheet.data.sheets?.find(s => s.properties?.title === "Comercial"); //nome da aba
     const sheetId = sheet?.properties?.sheetId;
 
     if (sheetId === undefined) {
-      return NextResponse.json({ error: "Aba 'app' não encontrada" }, { status: 404 });
+      return NextResponse.json({ error: "Aba 'Comercial' não encontrada" }, { status: 404 });
     }
 
     await sheets.spreadsheets.batchUpdate({
@@ -204,8 +236,8 @@ export async function DELETE(request: Request) {
               range: {
                 sheetId: sheetId,
                 dimension: "ROWS",
-                startIndex: rowIndex - 1,
-                endIndex: rowIndex,
+                startIndex: rowIndex - 1, // Início (inclusivo)
+                endIndex: rowIndex,       // Fim (exclusivo)
               },
             },
           },
@@ -215,9 +247,9 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Erro ao excluir dado da planilha app:", error);
+    console.error("Erro ao excluir dado da planilha:", error);
     return NextResponse.json(
-      { error: "Erro ao excluir dado na planilha" },
+      { error: "Erro ao excluir dado da planilha" },
       { status: 500 }
     );
   }

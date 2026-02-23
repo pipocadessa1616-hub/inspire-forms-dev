@@ -9,18 +9,22 @@ interface Unidade {
   nome: string;
 }
 
-interface DataRecord {
+interface DailyDataRecord {
   rowIndex: number;
   data: string;
   unidade: string;
-  inadimplentes: string;
-  plano: string;
-  wellhub: string;
-  totalpass: string;
+  leadsRecebidos: string;
+  experimentaisAgendadas: string;
+  aulasRealizadas: string;
+  vendas: string;
+  totalpassAgendamentos: string;
+  totalpassPresencas: string;
+  wellhubAgendamentos: string;
+  wellhubPresenca: string;
 }
 
-export default function HistoricoEdicaoPage() {
-  const [records, setRecords] = useState<DataRecord[]>([]);
+export default function HistoricoDadosDiariosPage() {
+  const [records, setRecords] = useState<DailyDataRecord[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +36,12 @@ export default function HistoricoEdicaoPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Edição
-  const [editingRecord, setEditingRecord] = useState<DataRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<DailyDataRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-
+  
   // Exclusão
-  const [deletingRecord, setDeletingRecord] = useState<DataRecord | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState<DailyDataRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Carregar dados iniciais
@@ -46,7 +50,7 @@ export default function HistoricoEdicaoPage() {
       try {
         const [unidadesRes, recordsRes] = await Promise.all([
           fetch("/api/unidades"),
-          fetch("/api/submit")
+          fetch("/api/dados-diarios-historico")
         ]);
 
         if (!unidadesRes.ok || !recordsRes.ok) throw new Error("Falha ao carregar dados");
@@ -76,6 +80,7 @@ export default function HistoricoEdicaoPage() {
 
   const formatDateForInput = (dateStr: string) => {
     if (!dateStr) return "";
+    if (dateStr.includes('-')) return dateStr;
     const parts = dateStr.split('/');
     if (parts.length !== 3) return "";
     return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
@@ -123,18 +128,31 @@ export default function HistoricoEdicaoPage() {
   // Calcular totais
   const totals = useMemo(() => {
     return filteredRecords.reduce((acc, record) => ({
-      inadimplentes: acc.inadimplentes + Number(record.inadimplentes || 0),
-      plano: acc.plano + Number(record.plano || 0),
-      wellhub: acc.wellhub + Number(record.wellhub || 0),
-      totalpass: acc.totalpass + Number(record.totalpass || 0),
-    }), { inadimplentes: 0, plano: 0, wellhub: 0, totalpass: 0 });
+      leadsRecebidos: acc.leadsRecebidos + Number(record.leadsRecebidos || 0),
+      experimentaisAgendadas: acc.experimentaisAgendadas + Number(record.experimentaisAgendadas || 0),
+      aulasRealizadas: acc.aulasRealizadas + Number(record.aulasRealizadas || 0),
+      vendas: acc.vendas + Number(record.vendas || 0),
+      totalpassAgendamentos: acc.totalpassAgendamentos + Number(record.totalpassAgendamentos || 0),
+      totalpassPresencas: acc.totalpassPresencas + Number(record.totalpassPresencas || 0),
+      wellhubAgendamentos: acc.wellhubAgendamentos + Number(record.wellhubAgendamentos || 0),
+      wellhubPresenca: acc.wellhubPresenca + Number(record.wellhubPresenca || 0),
+    }), {
+      leadsRecebidos: 0,
+      experimentaisAgendadas: 0,
+      aulasRealizadas: 0,
+      vendas: 0,
+      totalpassAgendamentos: 0,
+      totalpassPresencas: 0,
+      wellhubAgendamentos: 0,
+      wellhubPresenca: 0,
+    });
   }, [filteredRecords]);
 
   const getUnidadeNome = (id: string) => {
     return unidades.find(u => u.id === id)?.nome || id;
   };
 
-  const handleEditClick = (record: DataRecord) => {
+  const handleEditClick = (record: DailyDataRecord) => {
     const dateForInput = formatDateForInput(record.data);
     setEditingRecord({ ...record, data: dateForInput });
     setSaveMessage(null);
@@ -152,15 +170,19 @@ export default function HistoricoEdicaoPage() {
         rowIndex: editingRecord.rowIndex,
         date: editingRecord.data,
         unidade: editingRecord.unidade,
-        inadimplentes: editingRecord.inadimplentes,
-        plano: editingRecord.plano,
-        wellhub: editingRecord.wellhub,
-        totalpass: editingRecord.totalpass,
+        leadsRecebidos: editingRecord.leadsRecebidos,
+        experimentaisAgendadas: editingRecord.experimentaisAgendadas,
+        aulasRealizadas: editingRecord.aulasRealizadas,
+        vendas: editingRecord.vendas,
+        totalpassAgendamentos: editingRecord.totalpassAgendamentos,
+        totalpassPresencas: editingRecord.totalpassPresencas,
+        wellhubAgendamentos: editingRecord.wellhubAgendamentos,
+        wellhubPresenca: editingRecord.wellhubPresenca,
       };
 
       console.log("📤 Enviando para API:", payload);
 
-      const res = await fetch("/api/submit", {
+      const res = await fetch("/api/dados-diarios-historico", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -199,12 +221,37 @@ export default function HistoricoEdicaoPage() {
     setEditingRecord({ ...editingRecord, data: newDate });
   };
 
+  const handleInputChange = (field: keyof DailyDataRecord, value: string) => {
+    if (!editingRecord) return;
+    setEditingRecord({ ...editingRecord, [field]: value });
+  };
+
+  const handleDelete = async (rowIndex: number) => {
+    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
+
+    try {
+      const res = await fetch("/api/dados-diarios-historico", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowIndex }),
+      });
+
+      if (!res.ok) throw new Error("Erro ao excluir");
+
+      setRecords(prev => prev.filter(r => r.rowIndex !== rowIndex));
+      alert("Registro excluído com sucesso!");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao excluir registro.");
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deletingRecord) return;
     
     setIsDeleting(true);
     try {
-      const res = await fetch("/api/submit", {
+      const res = await fetch("/api/dados-diarios-historico", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rowIndex: deletingRecord.rowIndex }),
@@ -231,20 +278,11 @@ export default function HistoricoEdicaoPage() {
     }
   };
 
-  // Badge de status
-  const getStatusBadge = (value: string | number) => {
-    const num = Number(value);
-    if (num === 0) return "bg-gray-100 text-gray-600";
-    if (num < 5) return "bg-green-100 text-green-700";
-    if (num < 10) return "bg-yellow-100 text-yellow-700";
-    return "bg-red-100 text-red-700";
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center p-4"
       style={{ background: "linear-gradient(135deg, #AAACDF 0%, #7867F2 50%, #6441BF 100%)" }}
     >
-      <main className="w-full max-w-7xl">
+      <main className="w-full max-w-[95rem]">
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl p-6 md:p-8 relative min-h-[80vh]">
           
           {/* Header */}
@@ -256,17 +294,12 @@ export default function HistoricoEdicaoPage() {
               </svg>
               <span className="font-semibold">Voltar</span>
             </Link>
-            <Image
-              src="/inspire-logo-transparente.png"
-              alt="Inspire"
-              width={60}
-              height={60}
-            />
+            <Image src="/inspire-logo-transparente.png" alt="Inspire" width={60} height={60} />
           </div>
 
           <div className="mb-6 text-center">
             <h1 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: "#6441BF" }}>
-              Histórico e Edição - Alunos por Plano
+              Histórico e Edição - Dados Diários
             </h1>
             <div className="mx-auto w-20 h-1 rounded-full mb-3" style={{ background: "linear-gradient(90deg, #5CD1FB, #7867F2)" }} />
             {!isLoading && !error && (
@@ -293,29 +326,15 @@ export default function HistoricoEdicaoPage() {
             </div>
             <div>
               <label className="block text-xs font-bold text-[#6441BF] mb-1">DATA INICIAL</label>
-              <input
-                type="date"
-                value={filterDateStart}
-                onChange={(e) => setFilterDateStart(e.target.value)}
-                className="w-full p-2 rounded border border-[#AAACDF] text-sm text-gray-700 outline-none focus:border-[#7867F2]"
-              />
+              <input type="date" value={filterDateStart} onChange={(e) => setFilterDateStart(e.target.value)} className="w-full p-2 rounded border border-[#AAACDF] text-sm text-gray-700 outline-none focus:border-[#7867F2]" />
             </div>
             <div>
               <label className="block text-xs font-bold text-[#6441BF] mb-1">DATA FINAL</label>
-              <input
-                type="date"
-                value={filterDateEnd}
-                onChange={(e) => setFilterDateEnd(e.target.value)}
-                className="w-full p-2 rounded border border-[#AAACDF] text-sm text-gray-700 outline-none focus:border-[#7867F2]"
-              />
+              <input type="date" value={filterDateEnd} onChange={(e) => setFilterDateEnd(e.target.value)} className="w-full p-2 rounded border border-[#AAACDF] text-sm text-gray-700 outline-none focus:border-[#7867F2]" />
             </div>
             <div>
               <label className="block text-xs font-bold text-[#6441BF] mb-1">ORDENAR POR</label>
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-                className="w-full p-2 rounded border border-[#AAACDF] text-sm text-gray-700 outline-none focus:border-[#7867F2]"
-              >
+              <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')} className="w-full p-2 rounded border border-[#AAACDF] text-sm text-gray-700 outline-none focus:border-[#7867F2]">
                 <option value="desc">Mais recentes</option>
                 <option value="asc">Mais antigos</option>
               </select>
@@ -339,30 +358,34 @@ export default function HistoricoEdicaoPage() {
               <table className="w-full hidden md:table text-sm text-left text-gray-600">
                 <thead className="text-xs text-[#6441BF] uppercase bg-[#F0F1FA] sticky top-0">
                   <tr>
-                    <th className="px-4 py-3 rounded-l-lg">Data</th>
-                    <th className="px-4 py-3">Unidade</th>
-                    <th className="px-4 py-3 text-center">Inadimplentes</th>
-                    <th className="px-4 py-3 text-center">Plano</th>
-                    <th className="px-4 py-3 text-center">Wellhub</th>
-                    <th className="px-4 py-3 text-center">Totalpass</th>
-                    <th className="px-4 py-3 rounded-r-lg text-center">Ações</th>
+                    <th className="px-2 py-3 rounded-l-lg">Data</th>
+                    <th className="px-2 py-3">Unidade</th>
+                    <th className="px-2 py-3 text-center">Leads</th>
+                    <th className="px-2 py-3 text-center">Exp. Agend.</th>
+                    <th className="px-2 py-3 text-center">Aulas Real.</th>
+                    <th className="px-2 py-3 text-center">Vendas</th>
+                    <th className="px-2 py-3 text-center">TP Agend.</th>
+                    <th className="px-2 py-3 text-center">TP Pres.</th>
+                    <th className="px-2 py-3 text-center">WH Agend.</th>
+                    <th className="px-2 py-3 text-center">WH Pres.</th>
+                    <th className="px-2 py-3 rounded-r-lg text-center">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRecords.map((record, index) => (
                     <tr key={record.rowIndex} className={`border-b border-gray-100 hover:bg-[#F0F1FA] transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                      <td className="px-4 py-3 font-medium">{record.data}</td>
-                      <td className="px-4 py-3">{getUnidadeNome(record.unidade)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusBadge(record.inadimplentes)}`}>
-                          {record.inadimplentes}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center font-semibold">{record.plano}</td>
-                      <td className="px-4 py-3 text-center">{record.wellhub}</td>
-                      <td className="px-4 py-3 text-center">{record.totalpass}</td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-3">
+                      <td className="px-2 py-3 font-medium whitespace-nowrap">{record.data}</td>
+                      <td className="px-2 py-3 whitespace-nowrap">{getUnidadeNome(record.unidade)}</td>
+                      <td className="px-2 py-3 text-center">{record.leadsRecebidos}</td>
+                      <td className="px-2 py-3 text-center">{record.experimentaisAgendadas}</td>
+                      <td className="px-2 py-3 text-center">{record.aulasRealizadas}</td>
+                      <td className="px-2 py-3 text-center">{record.vendas}</td>
+                      <td className="px-2 py-3 text-center">{record.totalpassAgendamentos}</td>
+                      <td className="px-2 py-3 text-center">{record.totalpassPresencas}</td>
+                      <td className="px-2 py-3 text-center">{record.wellhubAgendamentos}</td>
+                      <td className="px-2 py-3 text-center">{record.wellhubPresenca}</td>
+                      <td className="px-2 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleEditClick(record)}
                             className="inline-flex items-center gap-1 text-[#7867F2] hover:text-[#6441BF] font-semibold hover:underline transition-colors"
@@ -392,21 +415,21 @@ export default function HistoricoEdicaoPage() {
                   {/* Linha de Totais */}
                   {filteredRecords.length > 0 && (
                     <tr className="bg-gradient-to-r from-[#F0F1FA] to-[#E8E9F8] font-bold text-[#6441BF] border-t-2 border-[#7867F2]">
-                      <td className="px-4 py-3" colSpan={2}>TOTAIS</td>
-                      <td className="px-4 py-3 text-center">{totals.inadimplentes}</td>
-                      <td className="px-4 py-3 text-center">{totals.plano}</td>
-                      <td className="px-4 py-3 text-center">{totals.wellhub}</td>
-                      <td className="px-4 py-3 text-center">{totals.totalpass}</td>
-                      <td className="px-4 py-3"></td>
+                      <td className="px-2 py-3" colSpan={2}>TOTAIS</td>
+                      <td className="px-2 py-3 text-center">{totals.leadsRecebidos}</td>
+                      <td className="px-2 py-3 text-center">{totals.experimentaisAgendadas}</td>
+                      <td className="px-2 py-3 text-center">{totals.aulasRealizadas}</td>
+                      <td className="px-2 py-3 text-center">{totals.vendas}</td>
+                      <td className="px-2 py-3 text-center">{totals.totalpassAgendamentos}</td>
+                      <td className="px-2 py-3 text-center">{totals.totalpassPresencas}</td>
+                      <td className="px-2 py-3 text-center">{totals.wellhubAgendamentos}</td>
+                      <td className="px-2 py-3 text-center">{totals.wellhubPresenca}</td>
+                      <td className="px-2 py-3"></td>
                     </tr>
                   )}
 
                   {filteredRecords.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="text-center py-8 text-gray-400">
-                        Nenhum registro encontrado.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={11} className="text-center py-8 text-gray-400">Nenhum registro encontrado.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -416,33 +439,25 @@ export default function HistoricoEdicaoPage() {
                 {filteredRecords.map((record) => (
                   <div key={record.rowIndex} className="bg-white border-2 border-[#AAACDF] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <span className="text-xs font-bold text-[#6441BF] block mb-1">DATA</span>
-                        <span className="text-sm font-semibold text-gray-800">{record.data}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs font-bold text-[#6441BF] block mb-1">UNIDADE</span>
-                        <span className="text-sm font-semibold text-gray-800">{getUnidadeNome(record.unidade)}</span>
-                      </div>
+                      <div><span className="text-xs font-bold text-[#6441BF] block mb-1">DATA</span><span className="text-sm font-semibold text-gray-800">{record.data}</span></div>
+                      <div className="text-right"><span className="text-xs font-bold text-[#6441BF] block mb-1">UNIDADE</span><span className="text-sm font-semibold text-gray-800">{getUnidadeNome(record.unidade)}</span></div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                    <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                       <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                        <span className="text-gray-600">Inadimplentes:</span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusBadge(record.inadimplentes)}`}>
-                          {record.inadimplentes}
-                        </span>
+                        <span className="text-gray-600">Leads:</span>
+                        <span className="font-semibold text-gray-800">{record.leadsRecebidos}</span>
                       </div>
                       <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                        <span className="text-gray-600">Plano:</span>
-                        <span className="font-semibold text-gray-800">{record.plano}</span>
+                        <span className="text-gray-600">Vendas:</span>
+                        <span className="font-semibold text-gray-800">{record.vendas}</span>
                       </div>
                       <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                        <span className="text-gray-600">Wellhub:</span>
-                        <span className="font-semibold text-gray-800">{record.wellhub}</span>
+                        <span className="text-gray-600">Exp. Agend:</span>
+                        <span className="font-semibold text-gray-800">{record.experimentaisAgendadas}</span>
                       </div>
                       <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                        <span className="text-gray-600">Totalpass:</span>
-                        <span className="font-semibold text-gray-800">{record.totalpass}</span>
+                        <span className="text-gray-600">Aulas Real:</span>
+                        <span className="font-semibold text-gray-800">{record.aulasRealizadas}</span>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-3">
@@ -462,10 +477,7 @@ export default function HistoricoEdicaoPage() {
                     </div>
                   </div>
                 ))}
-                
-                {filteredRecords.length === 0 && (
-                  <div className="text-center py-8 text-gray-400">Nenhum registro encontrado.</div>
-                )}
+                {filteredRecords.length === 0 && <div className="text-center py-8 text-gray-400">Nenhum registro encontrado.</div>}
               </div>
             </div>
           )}
@@ -559,8 +571,8 @@ export default function HistoricoEdicaoPage() {
       {/* Modal de Edição */}
       {editingRecord && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 md:p-8 max-h-[90vh] overflow-y-auto animate-slideUp">
-            <h2 className="text-xl font-bold text-[#6441BF] mb-4">✏️ Editar Registro</h2>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 md:p-8 max-h-[90vh] overflow-y-auto animate-slideUp">
+            <h2 className="text-xl font-bold text-[#6441BF] mb-4">✏️ Editar Registro Diário</h2>
             
             {saveMessage && (
               <div className={`mb-4 p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${saveMessage.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -573,85 +585,57 @@ export default function HistoricoEdicaoPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1">DATA</label>
-                  <input
-                    type="date"
-                    value={editingRecord.data}
-                    onChange={(e) => handleDateChange(e.target.value)}
-                    className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors"
-                    required
-                  />
+                  <input type="date" value={editingRecord.data} onChange={(e) => handleDateChange(e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" required />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1">UNIDADE</label>
-                  <select
-                    value={editingRecord.unidade}
-                    onChange={(e) => setEditingRecord({ ...editingRecord, unidade: e.target.value })}
-                    className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors"
-                    required
-                  >
-                    {unidades.map(u => (
-                      <option key={u.id} value={u.id}>{u.nome}</option>
-                    ))}
+                  <select value={editingRecord.unidade} onChange={(e) => handleInputChange('unidade', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" required>
+                    {unidades.map(u => (<option key={u.id} value={u.id}>{u.nome}</option>))}
                   </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">INADIMPLENTES</label>
-                  <input
-                    type="number"
-                    value={editingRecord.inadimplentes}
-                    onChange={(e) => setEditingRecord({ ...editingRecord, inadimplentes: e.target.value })}
-                    className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors"
-                  />
+                  <label className="block text-xs font-bold text-gray-500 mb-1">LEADS</label>
+                  <input type="number" value={editingRecord.leadsRecebidos} onChange={(e) => handleInputChange('leadsRecebidos', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">PLANO</label>
-                  <input
-                    type="number"
-                    value={editingRecord.plano}
-                    onChange={(e) => setEditingRecord({ ...editingRecord, plano: e.target.value })}
-                    className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors"
-                  />
+                  <label className="block text-xs font-bold text-gray-500 mb-1">EXP. AGEND.</label>
+                  <input type="number" value={editingRecord.experimentaisAgendadas} onChange={(e) => handleInputChange('experimentaisAgendadas', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">WELLHUB</label>
-                  <input
-                    type="number"
-                    value={editingRecord.wellhub}
-                    onChange={(e) => setEditingRecord({ ...editingRecord, wellhub: e.target.value })}
-                    className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors"
-                  />
+                  <label className="block text-xs font-bold text-gray-500 mb-1">AULAS REAL.</label>
+                  <input type="number" value={editingRecord.aulasRealizadas} onChange={(e) => handleInputChange('aulasRealizadas', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">TOTALPASS</label>
-                  <input
-                    type="number"
-                    value={editingRecord.totalpass}
-                    onChange={(e) => setEditingRecord({ ...editingRecord, totalpass: e.target.value })}
-                    className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors"
-                  />
+                  <label className="block text-xs font-bold text-gray-500 mb-1">VENDAS</label>
+                  <input type="number" value={editingRecord.vendas} onChange={(e) => handleInputChange('vendas', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-3 rounded-lg">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">TP AGEND.</label>
+                  <input type="number" value={editingRecord.totalpassAgendamentos} onChange={(e) => handleInputChange('totalpassAgendamentos', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">TP PRES.</label>
+                  <input type="number" value={editingRecord.totalpassPresencas} onChange={(e) => handleInputChange('totalpassPresencas', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">WH AGEND.</label>
+                  <input type="number" value={editingRecord.wellhubAgendamentos} onChange={(e) => handleInputChange('wellhubAgendamentos', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">WH PRES.</label>
+                  <input type="number" value={editingRecord.wellhubPresenca} onChange={(e) => handleInputChange('wellhubPresenca', e.target.value)} className="w-full p-2 border-2 rounded-lg focus:border-[#7867F2] outline-none text-gray-800 transition-colors" />
                 </div>
               </div>
 
               <div className="flex gap-3 mt-6 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => setEditingRecord(null)}
-                  className="flex-1 py-2 px-4 border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                  disabled={isSaving}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="flex-1 py-2 px-4 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-70"
-                  style={{ background: "linear-gradient(135deg, #7867F2, #6441BF)" }}
-                >
-                  {isSaving ? "⏳ Salvando..." : "💾 Salvar"}
-                </button>
+                <button type="button" onClick={() => setEditingRecord(null)} className="flex-1 py-2 px-4 border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 font-medium transition-colors" disabled={isSaving}>Cancelar</button>
+                <button type="submit" disabled={isSaving} className="flex-1 py-2 px-4 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-70" style={{ background: "linear-gradient(135deg, #7867F2, #6441BF)" }}>{isSaving ? "⏳ Salvando..." : "💾 Salvar"}</button>
               </div>
             </form>
           </div>

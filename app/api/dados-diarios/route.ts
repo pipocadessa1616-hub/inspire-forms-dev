@@ -18,46 +18,46 @@ export async function POST(request: Request) {
 
     const { sheets, spreadsheetId } = getSheets();
 
-    // Buscar dados existentes na coluna C para achar a próxima linha vazia
-    const existing = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "Comercial!C:C",
-    });
-
-    const nextRow = (existing.data.values?.length ?? 0) + 1;
-
     // A data vem como "YYYY-MM-DD" do input
     const [year, month, day] = date.split('-');
     const formattedDate = `${day}/${month}/${year}`;
 
-    // Escrever nas colunas A e B (data e unidade)
-    await sheets.spreadsheets.values.update({
+    // ✅ CORREÇÃO 1: Verificar se já existe um registro com a mesma data e unidade
+    const existing = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `Comercial!A${nextRow}:B${nextRow}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [[formattedDate, String(unidade)]],
-      },
+      range: "Comercial!A2:J",
     });
 
-    // Escrever nas colunas C até J (todos os dados numéricos)
+    const rows = existing.data.values ?? [];
+    const duplicate = rows.find(row => row[0] === formattedDate && row[1] === String(unidade));
+
+    if (duplicate) {
+      return NextResponse.json(
+        { error: "Já existe um registro para esta data e unidade" },
+        { status: 409 } // 409 = Conflict
+      );
+    }
+
+    const nextRow = (existing.data.values?.length ?? 0) + 2; // +2 porque começa em A2
+
+    // ✅ CORREÇÃO 2: Escrever tudo em UMA ÚNICA requisição
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `Comercial!C${nextRow}:J${nextRow}`,
+      range: `Comercial!A${nextRow}:J${nextRow}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
-        values: [
-          [
-            Number(leadsRecebidos),        // Coluna C
-            Number(experimentaisAgendadas), // Coluna D
-            Number(aulasRealizadas),        // Coluna E
-            Number(vendas),                 // Coluna F
-            Number(totalpassAgendamentos),  // Coluna G
-            Number(totalpassPresencas),     // Coluna H
-            Number(wellhubAgendamentos),    // Coluna I
-            Number(wellhubPresenca),        // Coluna J
-          ],
-        ],
+        values: [[
+          formattedDate,
+          String(unidade),
+          Number(leadsRecebidos),
+          Number(experimentaisAgendadas),
+          Number(aulasRealizadas),
+          Number(vendas),
+          Number(totalpassAgendamentos),
+          Number(totalpassPresencas),
+          Number(wellhubAgendamentos),
+          Number(wellhubPresenca),
+        ]],
       },
     });
 

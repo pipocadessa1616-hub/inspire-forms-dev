@@ -41,14 +41,6 @@ export async function POST(request: Request) {
 
     const { sheets, spreadsheetId } = getSheets();
 
-    // Buscar dados existentes na coluna C para achar a próxima linha vazia
-    const existing = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "app!C:C",
-    });
-
-    const nextRow = (existing.data.values?.length ?? 0) + 1;
-
     let dateStr;
     if (date) {
       const [year, month, day] = date.split("-");
@@ -58,30 +50,38 @@ export async function POST(request: Request) {
       dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
     }
 
-    // Escrever nas colunas A e B (data e unidade)
-    await sheets.spreadsheets.values.update({
+    // ✅ CORREÇÃO 1: Verificar se já existe um registro com a mesma data e unidade
+    const existing = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `app!A${nextRow}:B${nextRow}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [[dateStr, String(unidade)]],
-      },
+      range: "app!A2:F",
     });
 
-    // Escrever nas colunas C, D, E, F (inadimplentes, plano, wellhub, totalpass)
+    const rows = existing.data.values ?? [];
+    const duplicate = rows.find(row => row[0] === dateStr && row[1] === String(unidade));
+
+    if (duplicate) {
+      return NextResponse.json(
+        { error: "Já existe um registro para esta data e unidade" },
+        { status: 409 } // 409 = Conflict
+      );
+    }
+
+    const nextRow = (existing.data.values?.length ?? 0) + 2; // +2 porque começa em A2
+
+    // ✅ CORREÇÃO 2: Escrever tudo em UMA ÚNICA requisição
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `app!C${nextRow}:F${nextRow}`,
+      range: `app!A${nextRow}:F${nextRow}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
-        values: [
-          [
-            Number(inadimplentes),
-            Number(plano),
-            Number(wellhub),
-            Number(totalpass),
-          ],
-        ],
+        values: [[
+          dateStr,
+          String(unidade),
+          Number(inadimplentes),
+          Number(plano),
+          Number(wellhub),
+          Number(totalpass),
+        ]],
       },
     });
 
@@ -117,6 +117,19 @@ export async function PUT(request: Request) {
       formattedDate = `${day}/${month}/${year}`;
     }
 
+    // ✅ CORREÇÃO 3: Verificar se a linha ainda existe antes de atualizar
+    const existing = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `app!A${rowIndex}:F${rowIndex}`,
+    });
+
+    if (!existing.data.values || existing.data.values.length === 0) {
+      return NextResponse.json(
+        { error: "Registro não encontrado" },
+        { status: 404 }
+      );
+    }
+
     // Atualizar a linha específica (Colunas A até F)
     await sheets.spreadsheets.values.update({
       spreadsheetId,
@@ -141,6 +154,70 @@ export async function PUT(request: Request) {
     console.error("Erro ao atualizar dados:", error);
     return NextResponse.json(
       { error: "Erro ao atualizar dados na planilha" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Excluir uma linha da planilha de Alunos por Plano
+export async function DELETE(request: Request) {
+  try {
+    const { rowIndex } = await request.json();
+
+    if (!rowIndex) {
+      return NextResponse.json(
+        { error: "O índice da linha (rowIndex) é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    const { sheets, spreadsheetId } = getSheets();
+
+    // ✅ CORREÇÃO 4: Verificar se a linha existe antes de excluir
+    const existing = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `app!A${rowIndex}:F${rowIndex}`,
+    });
+
+    if (!existing.data.values || existing.data.values.length === 0) {
+      return NextResponse.json(
+        { error: "Registro não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // Busca o ID da aba "app"
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheet = spreadsheet.data.sheets?.find(s => s.properties?.title === "app");
+    const sheetId = sheet?.properties?.sheetId;
+
+    if (sheetId === undefined) {
+      return NextResponse.json({ error: "Aba 'app' não encontrada" }, { status: 404 });
+    }
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: sheetId,
+                dimension: "ROWS",
+                startIndex: rowIndex - 1,
+                endIndex: rowIndex,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Erro ao excluir dado da planilha app:", error);
+    return NextResponse.json(
+      { error: "Erro ao excluir dado na planilha" },
       { status: 500 }
     );
   }

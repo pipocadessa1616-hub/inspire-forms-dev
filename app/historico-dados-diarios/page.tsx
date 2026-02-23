@@ -39,6 +39,10 @@ export default function HistoricoDadosDiariosPage() {
   const [editingRecord, setEditingRecord] = useState<DailyDataRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  
+  // Exclusão
+  const [deletingRecord, setDeletingRecord] = useState<DailyDataRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -98,12 +102,20 @@ export default function HistoricoDadosDiariosPage() {
     }
 
     if (filterDateStart) {
-      const start = new Date(filterDateStart);
-      filtered = filtered.filter(r => parseDate(r.data) >= start);
+      const [year, month, day] = filterDateStart.split('-');
+      const start = new Date(Number(year), Number(month) - 1, Number(day));
+      filtered = filtered.filter(r => {
+        const recordDate = parseDate(r.data);
+        return recordDate >= start;
+      });
     }
     if (filterDateEnd) {
-      const end = new Date(filterDateEnd);
-      filtered = filtered.filter(r => parseDate(r.data) <= end);
+      const [year, month, day] = filterDateEnd.split('-');
+      const end = new Date(Number(year), Number(month) - 1, Number(day), 23, 59, 59);
+      filtered = filtered.filter(r => {
+        const recordDate = parseDate(r.data);
+        return recordDate <= end;
+      });
     }
 
     return filtered.sort((a, b) => {
@@ -214,6 +226,58 @@ export default function HistoricoDadosDiariosPage() {
     setEditingRecord({ ...editingRecord, [field]: value });
   };
 
+  const handleDelete = async (rowIndex: number) => {
+    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
+
+    try {
+      const res = await fetch("/api/dados-diarios-historico", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowIndex }),
+      });
+
+      if (!res.ok) throw new Error("Erro ao excluir");
+
+      setRecords(prev => prev.filter(r => r.rowIndex !== rowIndex));
+      alert("Registro excluído com sucesso!");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao excluir registro.");
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingRecord) return;
+    
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/dados-diarios-historico", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowIndex: deletingRecord.rowIndex }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao excluir");
+      }
+
+      setRecords(prev => prev.filter(r => r.rowIndex !== deletingRecord.rowIndex));
+      
+      setDeletingRecord(null);
+      setSaveMessage({ type: 'success', text: "Registro excluído com sucesso!" });
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (err) {
+      console.error("Erro ao excluir:", err);
+      setDeletingRecord(null);
+      setSaveMessage({ type: 'error', text: err instanceof Error ? err.message : "Erro ao excluir registro." });
+      setTimeout(() => setSaveMessage(null), 3000);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center p-4"
       style={{ background: "linear-gradient(135deg, #AAACDF 0%, #7867F2 50%, #6441BF 100%)" }}
@@ -321,16 +385,29 @@ export default function HistoricoDadosDiariosPage() {
                       <td className="px-2 py-3 text-center">{record.wellhubAgendamentos}</td>
                       <td className="px-2 py-3 text-center">{record.wellhubPresenca}</td>
                       <td className="px-2 py-3 text-center">
-                        <button
-                          onClick={() => handleEditClick(record)}
-                          className="inline-flex items-center gap-1 text-[#7867F2] hover:text-[#6441BF] font-semibold hover:underline transition-colors"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 20h9"/>
-                            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-                          </svg>
-                          Editar
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleEditClick(record)}
+                            className="inline-flex items-center gap-1 text-[#7867F2] hover:text-[#6441BF] font-semibold hover:underline transition-colors"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h9"/>
+                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                            </svg>
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => setDeletingRecord(record)}
+                            className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 font-semibold hover:underline transition-colors"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18"/>
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                              <path d="M8 6V4c0-1 1-1 1-1h6c1 0 1 1 1 1v2"/>
+                            </svg>
+                            Excluir
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -383,9 +460,21 @@ export default function HistoricoDadosDiariosPage() {
                         <span className="font-semibold text-gray-800">{record.aulasRealizadas}</span>
                       </div>
                     </div>
-                    <button onClick={() => handleEditClick(record)} className="w-full py-2 text-center text-sm font-semibold text-white rounded-lg transition-all shadow-md hover:shadow-lg" style={{ background: "linear-gradient(135deg, #7867F2, #6441BF)" }}>
-                      ✏️ Editar Registro
-                    </button>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => handleEditClick(record)}
+                        className="flex-1 py-2 text-center text-sm font-semibold text-white rounded-lg transition-all shadow-md hover:shadow-lg"
+                        style={{ background: "linear-gradient(135deg, #7867F2, #6441BF)" }}
+                      >
+                        ✏️ Editar
+                      </button>
+                      <button
+                        onClick={() => setDeletingRecord(record)}
+                        className="flex-1 py-2 text-center text-sm font-semibold text-white bg-red-500 rounded-lg transition-all shadow-md hover:shadow-lg hover:bg-red-600"
+                      >
+                        🗑️ Excluir
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {filteredRecords.length === 0 && <div className="text-center py-8 text-gray-400">Nenhum registro encontrado.</div>}
@@ -394,6 +483,90 @@ export default function HistoricoDadosDiariosPage() {
           )}
         </div>
       </main>
+
+      {/* Modal de Confirmação de Exclusão */}
+      {deletingRecord && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-slideUp">
+            <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-red-100">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600">
+                <path d="M3 6h18"/>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                <path d="M8 6V4c0-1 1-1 1-1h6c1 0 1 1 1 1v2"/>
+                <line x1="10" x2="10" y1="11" y2="17"/>
+                <line x1="14" x2="14" y1="11" y2="17"/>
+              </svg>
+            </div>
+            
+            <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
+              Excluir Registro?
+            </h2>
+            
+            <p className="text-center text-gray-600 mb-6">
+              Tem certeza que deseja excluir este registro?<br/>
+              <span className="font-semibold text-gray-800">
+                {getUnidadeNome(deletingRecord.unidade)} - {deletingRecord.data}
+              </span><br/>
+              <span className="text-sm text-red-600">Esta ação não pode ser desfeita.</span>
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeletingRecord(null)}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 px-4 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Excluindo...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18"/>
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                      <path d="M8 6V4c0-1 1-1 1-1h6c1 0 1 1 1 1v2"/>
+                    </svg>
+                    Sim, Excluir
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mensagem de Sucesso/Erro Flutuante */}
+      {saveMessage && !editingRecord && (
+        <div className="fixed top-4 right-4 z-50 animate-slideDown">
+          <div className={`p-4 rounded-lg shadow-lg flex items-center gap-3 ${saveMessage.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+            {saveMessage.type === 'success' ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" x2="9" y1="9" y2="15"/>
+                <line x1="9" x2="15" y1="9" y2="15"/>
+              </svg>
+            )}
+            <span className="font-medium">{saveMessage.text}</span>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Edição */}
       {editingRecord && (
@@ -478,11 +651,18 @@ export default function HistoricoDadosDiariosPage() {
           from { transform: translateY(20px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
+        @keyframes slideDown {
+          from { transform: translateY(-20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
         .animate-fadeIn {
           animation: fadeIn 0.2s ease-out;
         }
         .animate-slideUp {
           animation: slideUp 0.3s ease-out;
+        }
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out;
         }
       `}</style>
     </div>
